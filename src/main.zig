@@ -18,6 +18,8 @@ pub fn main() !void {
     defer inputFile.close();
 
     const outputFile = blk: {
+        const parent = std.fs.path.dirname(outputFilePath) orelse ".";
+        try std.fs.cwd().makePath(parent);
         if (std.mem.eql(u8, outputFilePath, "-")) {
             break :blk std.io.getStdOut();
         } else {
