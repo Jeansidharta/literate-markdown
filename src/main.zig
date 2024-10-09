@@ -44,7 +44,7 @@ pub fn main() !void {
     var isCode = false;
     var buffer: [16384]u8 = undefined; // 16KiB
     while (try fileReader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-        const trimmedLine = line[std.mem.indexOfNone(u8, line, &[_]u8{ ' ', '\t' }) orelse 0 ..];
+        const trimmedLine = std.mem.trimLeft(u8, line, &[_]u8{ ' ', '\t' });
         if (std.mem.startsWith(u8, trimmedLine, "```")) {
             isCode = !isCode;
             continue;
