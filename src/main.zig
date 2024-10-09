@@ -12,18 +12,28 @@ pub fn main() !void {
         if (std.mem.eql(u8, inputFilePath, "-")) {
             break :blk std.io.getStdIn();
         } else {
-            break :blk try std.fs.cwd().openFile(inputFilePath, .{ .mode = .read_only });
+            break :blk std.fs.cwd().openFile(inputFilePath, .{ .mode = .read_only }) catch |e| {
+                std.log.err("Failed to open input file {s}: {}", .{ inputFilePath, e });
+                return e;
+            };
         }
     };
     defer inputFile.close();
 
     const outputFile = blk: {
-        const parent = std.fs.path.dirname(outputFilePath) orelse ".";
-        try std.fs.cwd().makePath(parent);
+        if (std.fs.path.dirname(outputFilePath)) |parent| {
+            std.fs.cwd().makePath(parent) catch |e| {
+                std.log.err("Failed to create path {s}: {}", .{ parent, e });
+                return e;
+            };
+        }
         if (std.mem.eql(u8, outputFilePath, "-")) {
             break :blk std.io.getStdOut();
         } else {
-            break :blk try std.fs.cwd().createFile(outputFilePath, .{});
+            break :blk std.fs.cwd().createFile(outputFilePath, .{}) catch |e| {
+                std.log.err("Failed to open output file {s}: {}", .{ outputFilePath, e });
+                return e;
+            };
         }
     };
     defer outputFile.close();
@@ -32,7 +42,7 @@ pub fn main() !void {
     const fileWriter = outputFile.writer();
 
     var isCode = false;
-    var buffer: [16512]u8 = undefined;
+    var buffer: [16384]u8 = undefined; // 16KiB
     while (try fileReader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
         const trimmedLine = line[std.mem.indexOfNone(u8, line, &[_]u8{ ' ', '\t' }) orelse 0 ..];
         if (std.mem.startsWith(u8, trimmedLine, "```")) {
