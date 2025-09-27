@@ -8,9 +8,9 @@ pub fn main() !void {
     const inputFilePath = stdargs.next() orelse "-";
     const outputFilePath = stdargs.next() orelse "-";
 
-    const inputFile = blk: {
+    var input_file = blk: {
         if (std.mem.eql(u8, inputFilePath, "-")) {
-            break :blk std.io.getStdIn();
+            break :blk std.fs.File.stdin();
         } else {
             break :blk std.fs.cwd().openFile(inputFilePath, .{ .mode = .read_only }) catch |e| {
                 std.log.err("Failed to open input file {s}: {}", .{ inputFilePath, e });
@@ -18,9 +18,12 @@ pub fn main() !void {
             };
         }
     };
-    defer inputFile.close();
+    defer input_file.close();
+    var reader_buf: [16 * 1024]u8 = undefined;
+    var input_reader = input_file.reader(&reader_buf);
+    var input = &input_reader.interface;
 
-    const outputFile = blk: {
+    const output_file = blk: {
         if (std.fs.path.dirname(outputFilePath)) |parent| {
             std.fs.cwd().makePath(parent) catch |e| {
                 std.log.err("Failed to create path {s}: {}", .{ parent, e });
@@ -28,7 +31,7 @@ pub fn main() !void {
             };
         }
         if (std.mem.eql(u8, outputFilePath, "-")) {
-            break :blk std.io.getStdOut();
+            break :blk std.fs.File.stdout();
         } else {
             break :blk std.fs.cwd().createFile(outputFilePath, .{}) catch |e| {
                 std.log.err("Failed to open output file {s}: {}", .{ outputFilePath, e });
@@ -36,22 +39,29 @@ pub fn main() !void {
             };
         }
     };
-    defer outputFile.close();
+    defer output_file.close();
 
-    const fileReader = inputFile.reader();
-    const fileWriter = outputFile.writer();
+    var output_buffer: [16 * 1024]u8 = undefined;
+    var output_writer = output_file.writer(&output_buffer);
+    const output = &output_writer.interface;
 
     var isCode = false;
-    var buffer: [16384]u8 = undefined; // 16KiB
-    while (try fileReader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+    while (true) {
+        const line = input.takeDelimiterExclusive('\n') catch |e| {
+            switch (e) {
+                error.EndOfStream => break,
+                else => return e,
+            }
+        };
         const trimmedLine = std.mem.trimLeft(u8, line, &[_]u8{ ' ', '\t' });
         if (std.mem.startsWith(u8, trimmedLine, "```")) {
             isCode = !isCode;
             continue;
         }
         if (isCode) {
-            _ = try fileWriter.write(line);
-            _ = try fileWriter.write("\n");
+            _ = try output.write(line);
+            _ = try output.writeByte('\n');
         }
     }
+    try output.flush();
 }
