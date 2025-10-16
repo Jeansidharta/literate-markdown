@@ -47,12 +47,11 @@ pub fn main() !void {
 
     var isCode = false;
     while (true) {
-        const line = input.takeDelimiterExclusive('\n') catch |e| {
+        const line = input.takeDelimiter('\n') catch |e| {
             switch (e) {
-                error.EndOfStream => break,
                 else => return e,
             }
-        };
+        } orelse break;
         const trimmedLine = std.mem.trimLeft(u8, line, &[_]u8{ ' ', '\t' });
         if (std.mem.startsWith(u8, trimmedLine, "```")) {
             isCode = !isCode;
