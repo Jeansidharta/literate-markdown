@@ -2,12 +2,25 @@
   description = "Zig project flake";
 
   inputs = {
-    zig2nix.url = "github:Cloudef/zig2nix";
+    zig2nix = {
+      url = "github:Cloudef/zig2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    zls = {
+      url = "github:zigtools/zls";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs =
-    { zig2nix, nixpkgs, ... }:
+    {
+      zig2nix,
+      zls,
+      nixpkgs,
+      ...
+    }:
     let
       flake-utils = zig2nix.inputs.flake-utils;
     in
@@ -17,7 +30,10 @@
         # Zig flake helper
         # Check the flake.nix in zig2nix project for more options:
         # <https://github.com/Cloudef/zig2nix/blob/master/flake.nix>
-        env = zig2nix.outputs.zig-env.${system} { };
+        env = zig2nix.outputs.zig-env.${system} {
+          inherit nixpkgs;
+          zig = zig2nix.packages.${system}.zig-master;
+        };
         pkgs = nixpkgs.legacyPackages.${system};
       in
       with builtins;
@@ -79,7 +95,7 @@
           # Packages required for compiling, linking and running
           # Libraries added here will be automatically added to the LD_LIBRARY_PATH and PKG_CONFIG_PATH
           nativeBuildInputs = [
-            pkgs.zls
+            zls.packages.${system}.default
           ]
           ++ packages.default.nativeBuildInputs
           ++ packages.default.buildInputs

@@ -1,7 +1,8 @@
 const std = @import("std");
 
-pub fn main() !void {
-    var stdargs = std.process.args();
+pub fn main(init: std.process.Init) !void {
+    var stdargs = init.minimal.args.iterate();
+
     // Skip program name
     _ = stdargs.next();
 
@@ -10,39 +11,39 @@ pub fn main() !void {
 
     var input_file = blk: {
         if (std.mem.eql(u8, inputFilePath, "-")) {
-            break :blk std.fs.File.stdin();
+            break :blk std.Io.File.stdin();
         } else {
-            break :blk std.fs.cwd().openFile(inputFilePath, .{ .mode = .read_only }) catch |e| {
+            break :blk std.Io.Dir.cwd().openFile(init.io, inputFilePath, .{ .mode = .read_only }) catch |e| {
                 std.log.err("Failed to open input file {s}: {}", .{ inputFilePath, e });
                 return e;
             };
         }
     };
-    defer input_file.close();
+    defer input_file.close(init.io);
     var reader_buf: [16 * 1024]u8 = undefined;
-    var input_reader = input_file.reader(&reader_buf);
+    var input_reader = input_file.reader(init.io, &reader_buf);
     var input = &input_reader.interface;
 
     const output_file = blk: {
         if (std.fs.path.dirname(outputFilePath)) |parent| {
-            std.fs.cwd().makePath(parent) catch |e| {
+            std.Io.Dir.cwd().createDirPath(init.io, parent) catch |e| {
                 std.log.err("Failed to create path {s}: {}", .{ parent, e });
                 return e;
             };
         }
         if (std.mem.eql(u8, outputFilePath, "-")) {
-            break :blk std.fs.File.stdout();
+            break :blk std.Io.File.stdout();
         } else {
-            break :blk std.fs.cwd().createFile(outputFilePath, .{}) catch |e| {
+            break :blk std.Io.Dir.cwd().createFile(init.io, outputFilePath, .{}) catch |e| {
                 std.log.err("Failed to open output file {s}: {}", .{ outputFilePath, e });
                 return e;
             };
         }
     };
-    defer output_file.close();
+    defer output_file.close(init.io);
 
     var output_buffer: [16 * 1024]u8 = undefined;
-    var output_writer = output_file.writer(&output_buffer);
+    var output_writer = output_file.writer(init.io, &output_buffer);
     const output = &output_writer.interface;
 
     var isCode = false;
@@ -52,7 +53,7 @@ pub fn main() !void {
                 else => return e,
             }
         } orelse break;
-        const trimmedLine = std.mem.trimLeft(u8, line, &[_]u8{ ' ', '\t' });
+        const trimmedLine = std.mem.trimStart(u8, line, &[_]u8{ ' ', '\t' });
         if (std.mem.startsWith(u8, trimmedLine, "```")) {
             isCode = !isCode;
             continue;
